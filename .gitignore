@@ -1,3 +1,6 @@
+# local
+gradle.properties.local
+
 # examples/references for when im testing
 examples/
 reference/

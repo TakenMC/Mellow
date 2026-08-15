@@ -2,6 +2,7 @@
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.polyfrost.gradle.util.noServerRunConfigs
+import java.util.Properties
 
 // Adds support for kotlin, and adds the Polyfrost Gradle Toolkit
 // which we use to prepare the environment.
@@ -215,32 +216,49 @@ tasks {
     }
 }
 
-tasks.named("build") {
-    doLast {
-        // Path to the built JAR file after the build (from the build/libs directory)
-        val finalJar = file("build/libs/${mod_archives_name}-1.8.9-forge-${mod_version}.jar")
+// looks for local properties file and loads the savePath property if it exists
+val localProperties = loadLocalProperties()
+val savePath: String = localProperties.getProperty("savePath", "")
 
-        // Ensure the built JAR file exists before proceeding
-        if (finalJar.exists()) {
-            // Additional destination directory
-            val home = System.getProperty("user.home")
-            val additionalDestDir =
-                    file(
-                            "$home/Library/Application Support/PrismLauncher/instances/1.8.9/.minecraft/mods"
-                    )
+if (savePath.isNotEmpty()) {
+    tasks.named("build") {
+        doLast {
+            // Path to the built JAR file after the build (from the build/libs directory)
+            val finalJar = file("build/libs/${mod_archives_name}-1.8.9-forge-${mod_version}.jar")
 
-            // Ensure the destination directory exists
-            additionalDestDir.mkdirs()
+            // Ensure the built JAR file exists before proceeding
+            if (finalJar.exists()) {
+                // Additional destination directory
+                val home = System.getProperty("user.home")
+                val expandedPath = savePath.replaceFirst("~", home).replace("\\", "/")
+                val additionalDestDir = file( expandedPath )
 
-            // Copy the final JAR to the additional directory
-            copy {
-                from(finalJar)
-                into(additionalDestDir)
+                // Ensure the destination directory exists
+                additionalDestDir.mkdirs()
+
+                // Copy the final JAR to the additional directory
+                copy {
+                    from(finalJar)
+                    into(additionalDestDir)
+                }
+
+                println("JAR file copied to: ${additionalDestDir.absolutePath}")
+            } else {
+                println("Built JAR file does not exist: ${finalJar.absolutePath}")
             }
-
-            println("JAR file copied to: ${additionalDestDir.absolutePath}")
-        } else {
-            println("Built JAR file does not exist: ${finalJar.absolutePath}")
         }
     }
+} else {
+    println("No savePath specified in gradle.properties.local. Skipping copy step.")
+}
+
+fun loadLocalProperties(): Properties {
+    val properties = Properties()
+    val file = rootProject.file("gradle.properties.local")
+
+    if (file.exists()) {
+        file.inputStream().use { properties.load(it) }
+    }
+
+    return properties
 }
